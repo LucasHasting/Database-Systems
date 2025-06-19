@@ -1,0 +1,231 @@
+Lucas Hasting
+CS 447
+11/30/2024
+Homework #4
+
+--Relations:
+
+Product (maker, model, type)
+PC (model, speed, ram, hd, price)
+Laptop (model, speed, ram, hd, screen, price)
+Printer( model, color, type, price)
+
+--Question 1
+
+Write the following embedded SQL queries based on the above database schema with host-language.
+
+--Question 1.a:
+
+Ask the user for a price and find the PC whose price is closest to the desired price. 
+Print the maker, model number and speed of the PC.
+
+--1.a Solution:
+
+void get_PC_info_from_price {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char maker [50];
+		float price, speed;
+		int model_number;
+		char SQLSTATE[6];
+	EXEC SQL END DECLARE SECTION;
+
+	printf("Enter the price: ");
+    	scanf("%d", &price);
+    	printf("\n");
+
+	EXEC SQL SELECT p.maker, PC.model, PC.speed
+		INTO :maker, :model_number, :speed
+		FROM Product p, PC
+		WHERE p.model=PC.model
+			AND ABS(:price - PC.price) = (
+			SELECT MIN(ABS(:price - PC.price))
+			FROM PC
+		);
+
+	int flag = 0;	
+
+	for(int i = 0; i < 6; ++i){
+		if(SQLSTATE[i] != 0){
+			flag = 1;
+		}
+	}
+
+	if(flag == 0){
+		printf("Maker: %s, Model number: %d, Speed: %f\n", maker, model_number, speed);
+	}
+}
+
+--Question 1.b:
+
+Ask the user for a manufacturer. Print the specifications of all products by that manufacturer. 
+That is, print the model number, product-type, and all the attributes of whichever relation is appropriate for that type.
+
+--1.b Solution:
+
+void get_manufacturer_info {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char manufacturer [50];
+		char type [8];
+		char color[50];
+		float price, speed, hd, ram;
+		int model_number, screen;
+		char SQLSTATE[6];
+	EXEC SQL END DECLARE SECTION;
+
+	printf("Enter the manufacturer: ");
+    	scanf("%s", &manufacturer);
+    	printf("\n");
+
+	EXEC SQL DECLARE manufacturerCursor CURSOR FOR
+		SELECT model, type 
+		FROM Product
+		WHERE maker = :manufacturer;
+
+	EXEC SQL OPEN manufacturerCursor;
+
+	while (l) {
+		EXEC SQL FETCH FROM manufacturerCursor INTO :model_number, :type;
+		if(N0_M0RE_TUPLES) break;
+
+		if (strncmp(type, "PC", 2) == 0) {
+			EXEC SQL DECLARE PCCursor CURSOR FOR
+				SELECT *
+				FROM PC
+				WHERE model = :model_number;
+
+			EXEC SQL OPEN PCCursor;
+			
+			while (l) {
+				EXEC SQL FETCH FROM PCCursor INTO :model_number, :speed, :ram, :hd, :price;
+				if(N0_M0RE_TUPLES) break;
+
+				int flag = 0;	
+
+				for(int i = 0; i < 6; ++i){
+					if(SQLSTATE[i] != 0){
+						flag = 1;
+					}
+				}
+
+				if(flag == 0){
+					printf("model number: %d, speed: %f, ram: %f, hd: %f, price: %f\n", model_number, speed, ram, hd, price);
+				}
+			}
+		
+			EXEC SQL CLOSE PCCursor;
+		}
+
+		if (strncmp(type, "Laptop", 6) == 0) {
+			EXEC SQL DECLARE LaptopCursor CURSOR FOR
+				SELECT *
+				FROM Laptop
+				WHERE model = :model_number;
+
+			EXEC SQL OPEN LaptopCursor;
+
+			while (l) {
+				EXEC SQL FETCH FROM LaptopCursor INTO :model_number, :speed, :ram, :hd, :screen, :price;
+				if(N0_M0RE_TUPLES) break;
+
+				int flag = 0;	
+
+				for(int i = 0; i < 6; ++i){
+					if(SQLSTATE[i] != 0){
+						flag = 1;
+					}
+				}
+	
+				if(flag == 0){
+					printf("model number: %d, speed: %f, ram: %f, hd: %f, screen: %d, price: %f\n", model_number, speed, ram, hd, screen, price);
+				}
+			}
+			
+			EXEC SQL CLOSE LaptopCursor;
+		}
+
+		if (strncmp(type, "Printer", 7) == 0) {
+			EXEC SQL DECLARE PrinterCursor CURSOR FOR
+				SELECT *
+				FROM Printer
+				WHERE model = :model_number;
+
+			EXEC SQL OPEN PrinterCursor;
+
+			while (l) {
+				EXEC SQL FETCH FROM PrinterCursor INTO :model_number, :color, :type, :price;
+				if(N0_M0RE_TUPLES) break;
+
+				int flag = 0;	
+
+				for(int i = 0; i < 6; ++i){
+					if(SQLSTATE[i] != 0){
+						flag = 1;
+					}
+				}
+
+				if(flag == 0){
+					printf("model number: %d, color: %s, type: %s, price: %f\n", model_number, color, type, price);
+				}
+			}
+
+			EXEC SQL CLOSE PrinterCursor;
+		}
+	}
+	EXEC SQL CLOSE manufacturerCursor;
+	
+}
+
+--Question 2:
+
+Write the following PSM functions or procedures based on the above database schema.
+
+--Question 2.a:
+
+Take a price as argument and return the model number of the PC whose price is closest.
+
+--2.a Solution:
+
+CREATE FUNCTION PC_Model (Price int) RETURNS INT
+	RETURN (
+		SELECT model
+		FROM PC
+		WHERE ABS(Price - price) = (
+		      SELECT MIN(ABS(Price - price))
+		      FROM PC
+		)
+	);
+
+
+--Question 2.b:
+
+Take a maker and model as arguments, and return the price of whatever type of product that model is.
+
+--2.b Solution:
+
+CREATE FUNCTION Product_Price (Maker VARCHAR(50), Model int) RETURNS INT 
+	DECLARE product_type VARCHAR(8);
+
+	SELECT type
+	INTO product_type
+	FROM Product
+	WHERE maker=Maker;
+
+	IF type = 'PC'
+		THEN RETURN (
+			SELECT price
+			FROM PC
+			WHERE model = Model
+		);
+	ELSEIF type = 'Laptop'
+		THEN RETURN (
+			SELECT price
+			FROM Laptop
+			WHERE model = Model
+		);
+	ELSEIF type = 'Printer'
+		THEN RETURN (
+			SELECT price
+			FROM Printer
+			WHERE model = Model
+		);
+	ENDIF;
